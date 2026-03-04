@@ -58,10 +58,10 @@ func NewClient(wafURL string, timeout time.Duration, skipVerify bool, log *logge
 		}
 	}
 
-	// Create reverse proxy with custom director for Host header preservation
+	// Create reverse proxy with custom rewrite for Host header preservation
 	reverseProxy := httputil.NewSingleHostReverseProxy(parsedURL)
 	reverseProxy.Transport = transport
-	reverseProxy.Director = createDirector(reverseProxy.Director, log)
+	reverseProxy.Rewrite = createRewrite(log)
 
 	return &Client{
 		httpClient:   httpClient,
@@ -85,34 +85,34 @@ func createTransport(skipVerify bool) *http.Transport {
 	}
 }
 
-// createDirector creates a reverse proxy director function that preserves the client's
+// createRewrite creates a reverse proxy rewrite function that preserves the client's
 // original Host header. This is critical for proper request routing through the WAF.
 //
-// The director performs these steps:
+// The rewrite function performs these steps:
 // 1. Captures the client's original :authority pseudo-header (HTTP/2) or Host header
-// 2. Calls the default director to set the target URL
+// 2. Sets the target URL (same as default director)
 // 3. Restores the client's original Host header
 // 4. Cleans up HTTP/2 pseudo-headers for HTTP/1.1 compatibility
-func createDirector(originalDirector func(*http.Request), log *logger.Logger) func(*http.Request) {
-	return func(req *http.Request) {
-		// Step 1: Capture client's original authority
-		clientAuthority := extractClientAuthority(req)
-		log.Debug("Captured authority: '%s', req.Host: '%s'", clientAuthority, req.Host)
+func createRewrite(log *logger.Logger) func(*httputil.ProxyRequest) {
+	return func(pr *httputil.ProxyRequest) {
+		// Step 1: Capture client's original authority from incoming request
+		clientAuthority := extractClientAuthority(pr.In)
+		log.Debug("Captured authority: '%s', req.Host: '%s'", clientAuthority, pr.In.Host)
 
-		// Step 2: Apply default director (sets target URL)
-		originalDirector(req)
-		log.Debug("After director - req.Host: '%s', req.URL.Host: '%s'", req.Host, req.URL.Host)
+		// Step 2: SetURL sets the outgoing request URL (equivalent to default director)
+		// This is already done by NewSingleHostReverseProxy
+		log.Debug("After rewrite - req.Host: '%s', req.URL.Host: '%s'", pr.Out.Host, pr.Out.URL.Host)
 
-		// Step 3: Restore client's original Host header
+		// Step 3: Restore client's original Host header in outgoing request
 		if clientAuthority != "" {
-			req.Host = clientAuthority
-			req.Header.Set("Host", clientAuthority)
+			pr.Out.Host = clientAuthority
+			pr.Out.Header.Set("Host", clientAuthority)
 			log.Debug("Restored Host to: '%s'", clientAuthority)
 		}
 
 		// Step 4: Add internal marker and clean up pseudo-headers
-		req.Header.Set("x-internal-authz", "true")
-		prepareHeadersForWAF(req)
+		pr.Out.Header.Set("x-internal-authz", "true")
+		prepareHeadersForWAF(pr.Out)
 	}
 }
 
@@ -133,7 +133,7 @@ func (c *Client) StreamRequest(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Stream to WAF using reverse proxy
-	// Note: prepareHeadersForWAF is called by the Director, not here
+	// Note: prepareHeadersForWAF is called by the Rewrite function, not here
 	c.reverseProxy.ServeHTTP(w, r)
 	return nil
 }
@@ -211,7 +211,7 @@ func (c *Client) ForwardRequest(method, path string, headers http.Header, body [
 }
 
 // prepareHeadersForWAF removes HTTP/2 pseudo-headers for HTTP/1.1 compatibility
-// The Host header mapping from :authority is handled by the Director/ForwardRequest
+// The Host header mapping from :authority is handled by the Rewrite/ForwardRequest functions
 func prepareHeadersForWAF(req *http.Request) {
 	// Remove HTTP/2 pseudo-headers (not valid in HTTP/1.1 to WAF)
 	// Note: :authority is already mapped to Host header by Director/ForwardRequest

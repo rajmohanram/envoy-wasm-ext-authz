@@ -104,11 +104,10 @@ jobs:
           cache-dependency-path: authz-service/go.sum
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.64
+          version: v2.10.1
           working-directory: authz-service
-          args: --timeout=5m
 
   authz-vet:
     name: "Go: Vet"
