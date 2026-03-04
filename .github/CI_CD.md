@@ -83,8 +83,6 @@ The `check-wasm` job verifies Cargo.toml exists before running any Rust jobs.
 
 - linux/amd64
 - linux/arm64
-- darwin/amd64
-- darwin/arm64
 
 **Docker Platforms:**
 
