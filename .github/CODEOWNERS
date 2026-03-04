@@ -1,0 +1,14 @@
+# Default owners for everything
+* @rajmohanram
+
+# Go service
+/authz-service/ @rajmohanram
+
+# Rust WASM plugin
+/wasm-plugin/ @rajmohanram
+
+# CI/CD workflows
+/.github/ @rajmohanram
+
+# Documentation
+*.md @rajmohanram
