@@ -77,7 +77,7 @@ jobs:
             authz-service-${{ matrix.goos }}-${{ matrix.goarch }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: authz-service-${{ matrix.goos }}-${{ matrix.goarch }}
           path: authz-service/bin/*.tar.gz
@@ -145,7 +145,7 @@ jobs:
         run: cargo build --target wasm32-wasip1 --release
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasm-plugin
           path: wasm-plugin/target/wasm32-wasip1/release/*.wasm
